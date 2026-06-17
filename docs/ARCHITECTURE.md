@@ -182,6 +182,12 @@ so the startup profiling run may briefly overflow and log a warning — expected
 and harmless (profiling output is discarded). If the warning appears during real
 decode, raise the slot count.
 
+The cache grows ~linearly with the slot count (≈ 2 GiB per expert for V4-Pro), so
+the upper bound is whatever VRAM is left after weights and KV. Raise slots until a
+step's experts fit; lower to reclaim VRAM.
+
+<p align="center"><img src="../assets/chart-tradeoff.png" alt="GPU cache size vs SLUICE_SLOTS" width="620"></p>
+
 ## 9. Limitations & roadmap
 
 - Monkeypatches an internal factory and relies on the modular

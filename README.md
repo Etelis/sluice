@@ -1,12 +1,31 @@
-# Sluice
+<p align="center">
+  <img src="assets/sluice-icon.png" alt="Sluice" width="150">
+</p>
 
-**Routing-aware MoE expert offloading for vLLM.** Run Mixture-of-Experts models
-whose expert weights are far larger than GPU memory — including
-**DeepSeek-V4** — by keeping the experts in host RAM and streaming only the
-ones the router selects into a small GPU cache, per forward step.
+<h1 align="center">Sluice</h1>
 
-Sluice ships as a **vLLM plugin**, not a fork. `pip install`, set one
-environment variable, run stock vLLM.
+<p align="center">
+  <b>Routing-aware MoE expert offloading for vLLM.</b>
+</p>
+
+<p align="center">
+  Run Mixture-of-Experts models whose expert weights are far larger than GPU
+  memory — including <b>DeepSeek-V4</b> — by keeping the experts in host RAM and
+  streaming only the ones the router selects into a small GPU cache, per forward
+  step. A vLLM <b>plugin</b>, not a fork: <code>pip install</code>, set one
+  environment variable, run stock vLLM.
+</p>
+
+<p align="center">
+  <a href="#quickstart">Quickstart</a> ·
+  <a href="#deploying-deepseek-v4">Deploy V4</a> ·
+  <a href="#results">Results</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="docs/ARCHITECTURE.md">Architecture</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a>
+</p>
+
+---
 
 ---
 

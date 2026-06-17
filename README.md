@@ -35,6 +35,12 @@ resident baseline (greedy, token ids). **V4-Pro** (FP8, EP=4) loads with just
 
 <p align="center"><img src="assets/chart-residency.png" alt="16 of 96 experts resident per layer/rank" width="560"></p>
 
+Streaming experts on demand costs only **~14%** throughput vs keeping them all
+resident (when the cache covers the per-step working set) — and lets V4-Pro
+serve at all, where it otherwise OOMs.
+
+<p align="center"><img src="assets/chart-throughput.png" alt="Decode throughput: ~14% overhead on V2-Lite; V4-Pro runs only with Sluice" width="700"></p>
+
 ## Deploy DeepSeek-V4
 
 ```bash

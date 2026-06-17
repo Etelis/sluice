@@ -113,6 +113,44 @@ def tradeoff_chart(path):
     print("wrote", path)
 
 
+def throughput_chart(path):
+    # Measured: 8 sequences x 128 tokens, greedy, enforce_eager.
+    fig, (axL, axR) = plt.subplots(
+        1, 2, figsize=(8.6, 4.2), dpi=200, gridspec_kw={"width_ratios": [1.25, 1]}
+    )
+    axL.bar([0, 1], [229.3, 195.9], color=[GREY, INDIGO], width=0.6)
+    axL.set_xticks([0, 1])
+    axL.set_xticklabels(["vanilla\n(resident)", "+ Sluice\n(slots=64)"], fontsize=10)
+    axL.set_ylabel("decode throughput (tok/s)", fontsize=10)
+    axL.set_title("V2-Lite · 1×H100 · BF16", fontsize=11, fontweight="bold", color=INK)
+    axL.set_ylim(0, 270)
+    for xi, v in [(0, 229.3), (1, 195.9)]:
+        axL.text(xi, v + 6, f"{v:.0f}", ha="center", fontsize=10, color=INK)
+    axL.annotate("~14% overhead", (1, 150), ha="center", color=GREEN, fontsize=10,
+                 fontweight="bold")
+
+    axR.bar([0, 1], [0, 17.3], color=[RED, INDIGO], width=0.6)
+    axR.set_xticks([0, 1])
+    axR.set_xticklabels(["vanilla", "+ Sluice\n(slots=16)"], fontsize=10)
+    axR.set_title("V4-Pro · 4×H100 · FP8 · EP=4", fontsize=11, fontweight="bold", color=INK)
+    axR.set_ylim(0, 24)
+    axR.text(1, 17.3 + 0.6, "17.3", ha="center", fontsize=10, color=INK)
+    axR.annotate("✗ OOM\n(can't run)", (0, 6), ha="center", color=RED, fontsize=10,
+                 fontweight="bold")
+
+    for ax in (axL, axR):
+        for s in ("top", "right"):
+            ax.spines[s].set_visible(False)
+    fig.suptitle("Decode throughput — 8 sequences × 128 tokens, greedy, enforce_eager",
+                 fontsize=12.5, fontweight="bold", color=INK)
+    fig.text(0.5, -0.02, "measured on H100 · with a cache that covers the per-step "
+             "working set, streaming costs ~14% · eager mode (no CUDA graphs)",
+             ha="center", fontsize=7.5, color="#7A828F")
+    fig.tight_layout(rect=[0, 0, 1, 0.96])
+    fig.savefig(path, bbox_inches="tight", facecolor="white")
+    print("wrote", path)
+
+
 if __name__ == "__main__":
     import os
 
@@ -120,3 +158,4 @@ if __name__ == "__main__":
     comparison_chart(os.path.join(here, "chart-comparison.png"))
     residency_chart(os.path.join(here, "chart-residency.png"))
     tradeoff_chart(os.path.join(here, "chart-tradeoff.png"))
+    throughput_chart(os.path.join(here, "chart-throughput.png"))

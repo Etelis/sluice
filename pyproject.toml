@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sluice-vllm"
+version = "0.1.0"
+description = "Routing-aware MoE expert offloading for vLLM — run DeepSeek-V4 (and other huge MoEs) on GPUs that cannot hold all the experts."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Itay Etelis" }]
+keywords = ["vllm", "moe", "mixture-of-experts", "offloading", "deepseek", "llm-inference"]
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+# vLLM is an explicit, version-pinned peer dependency: Sluice monkeypatches a
+# small internal surface (the offloader factory) and relies on the modular MoE
+# `quant_method.apply(layer, ..., topk_ids=...)` signature, so it must track a
+# known-good vLLM. Install vLLM separately and pin it; see the README.
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+
+[project.urls]
+Homepage = "https://github.com/Itay-Etelis/sluice"
+Issues = "https://github.com/Itay-Etelis/sluice/issues"
+
+# This is the whole integration surface: vLLM loads general plugins in every
+# engine/worker process at startup and calls `register()`.
+[project.entry-points."vllm.general_plugins"]
+sluice = "sluice.plugin:register"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 88

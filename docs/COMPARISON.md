@@ -4,21 +4,27 @@ DeepSeek-V4-Pro (FP8) is ~**805 GiB** of weights, almost all experts. That does
 not fit GPU-resident on a single 8×H100 node (**640 GiB**), so the engine either
 needs **more GPUs** (≈2 nodes) or has to **offload the experts** off the GPU.
 
-This page compares how the main inference engines handle that, as of June 2026.
 The honest axis isn't just *where the experts live* but **where they compute**.
+Here's every engine, and what actually happens on our **4×H100 (320 GiB)** box
+loading the **stock** DeepSeek-V4-Pro FP8 checkpoint:
 
-| Engine | Routed experts live in | Experts compute on | Runs V4-Pro on ≤8×H100 | Serving stack |
-|---|---|---|---|---|
-| **Sluice** (vLLM plugin) | host RAM, streamed into a small **GPU** cache (LRU, by routing) | **GPU** | ✅ — we ran it on **4×H100** + ~1 TB RAM | full vLLM (continuous batching, etc.) |
-| KTransformers | host RAM (shared experts on GPU) | **CPU** (AMX kernels) | ✅ — even 1 GPU (48 GB+) + big RAM | its own runtime |
-| llama.cpp | host RAM (`--n-cpu-moe` / `-ot exps=CPU`) | **CPU** | ✅ — flexible CPU/GPU split, GGUF | its own runtime |
-| SGLang | GPU-resident (a KTransformers offload path exists via `kt_*` args, needs KT-format weights) | GPU | ❌ **verified OOM on 4×H100**; needs ~2 nodes (≥~11×H100) | full SGLang |
-| vLLM (stock) | GPU-resident (`--cpu-offload-gb` is static, whole-tensor, routing-blind) | GPU | ❌ same — experts don't fit | full vLLM |
+| Engine | Routed experts | Expert compute | Tested on 4×H100, stock FP8 checkpoint |
+|---|---|---|---|
+| **Sluice** (vLLM) | host RAM → small **GPU** cache (LRU, by routing) | **GPU** | ✅ **runs · ~17 tok/s** |
+| stock vLLM | GPU-resident (`--cpu-offload-gb` is static, routing-blind) | GPU | ❌ **OOM** — GPU fills to ~78 GiB |
+| SGLang | GPU-resident (`kt_*` offload path needs KT-format weights) | GPU | ❌ **OOM** — GPU fills to ~76 GiB |
+| KTransformers | host RAM (shared experts on GPU) | **CPU** (AMX) | ⚠️ not runnable here — needs KT-format weights + a V4 recipe |
+| llama.cpp | host RAM (`--n-cpu-moe` / `-ot exps=CPU`) | **CPU** | ⚠️ not runnable here — needs GGUF + V4 arch support |
 
-> Model-architecture support varies by project and moves fast. vLLM and SGLang
-> support V4 day-0; KTransformers and llama.cpp add architectures on their own
-> cadence. This table compares the **offloading approach and memory
-> feasibility**, not who shipped a given model on a given day.
+> **What "tested" means.** The three GPU-compute engines were run directly from
+> the stock checkpoint on 4×H100: Sluice serves; stock vLLM and SGLang OOM
+> (805 GiB of weights ≫ 320 GiB — and a single 8×H100 node, 640 GiB, is short
+> too). KTransformers and llama.cpp use a different, **CPU-compute** approach
+> that can serve 671B-class MoEs on far less GPU — but not from this FP8
+> checkpoint without converting to their own weight formats and V4 architecture
+> support landing in-tree, so they're compared by approach, not re-run here.
+> Model support moves fast (vLLM and SGLang have V4 day-0); this is a June 2026
+> snapshot.
 
 ## The two families
 
@@ -46,12 +52,16 @@ the router-selected ones into a small GPU cache each step, so V4-Pro runs on
 the rest of the serving stack, at the cost of PCIe bandwidth for the streamed
 experts.
 
-> **Verified on our cluster (June 2026).** SGLang `0.5.13.post1` recognizes
-> `DeepseekV4ForCausalLM` and starts loading V4-Pro day-0, but with the stock
-> checkpoint it **OOMs on 4×H100** while creating the FP8 expert weights
-> (`fp8.py:create_weights` → GPU 0 fills at ~76 GiB, then `exit 137`) — the
-> same failure stock vLLM hits. Sluice loads and serves the same model on the
-> same 4×H100 box. 805 GiB > 640 GiB, so a single 8×H100 node is short too.
+> **Verified on our cluster (June 2026), all on the same 4×H100 box.**
+> - **SGLang** `0.5.13.post1` recognizes `DeepseekV4ForCausalLM` and loads V4-Pro
+>   day-0, but with the stock checkpoint **OOMs** creating the FP8 expert weights
+>   (`fp8.py:create_weights` → GPU 0 ~76 GiB, `exit 137`).
+> - **stock vLLM** (no Sluice) **OOMs** the same way (GPU ~78 GiB, engine-init
+>   failure).
+> - **Sluice** loads and serves the same model at **~17 tok/s**.
+>
+> 805 GiB of weights ≫ 320 GiB (4×H100), and ≫ 640 GiB (8×H100), so the
+> GPU-resident engines can't fit it on a single node either way.
 
 ## So which should you use?
 

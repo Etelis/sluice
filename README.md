@@ -56,20 +56,19 @@ load/forward paths, and the gotchas: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.
 
 ## Compared to other engines
 
-V4-Pro (FP8) is ~805 GiB — it can't sit GPU-resident on one 8×H100 node (640 GiB).
+We loaded the **stock V4-Pro FP8 checkpoint** (~805 GiB) on one **4×H100** box (320 GiB) with each engine:
 
-| Engine | Routed experts | Expert compute | V4-Pro on ≤8×H100 |
-|---|---|---|---|
-| **Sluice** (vLLM) | host RAM → streamed to GPU cache | **GPU** | ✅ (ran on 4×H100) |
-| KTransformers | host RAM | CPU | ✅ |
-| llama.cpp | host RAM (`-ot` / `--n-cpu-moe`) | CPU | ✅ (GGUF) |
-| SGLang · stock vLLM | GPU-resident | GPU | ❌ needs ~2 nodes |
+| Engine | Expert compute | On 4×H100, stock FP8 checkpoint |
+|---|---|---|
+| **Sluice** (vLLM) | GPU (streamed) | ✅ **runs · ~17 tok/s** |
+| stock vLLM | GPU | ❌ **OOM** (verified) |
+| SGLang | GPU | ❌ **OOM** (verified) |
+| KTransformers · llama.cpp | CPU | ⚠️ need their own weight format (KT / GGUF) |
 
-Sluice is the only one that streams experts onto the **GPU** for compute **inside
-vLLM's serving stack** — KTransformers and llama.cpp run experts on CPU (less GPU,
-but CPU-bound); SGLang is fastest yet must fit the weights in VRAM (verified: stock
-SGLang **OOMs loading V4-Pro on 4×H100**, same box Sluice serves it on).
-[Full comparison + sources →](docs/COMPARISON.md)
+GPU-resident engines can't fit V4's experts (805 GiB ≫ 320, and ≫ 640 GiB on
+8×H100). KTransformers and llama.cpp *can* offload, but compute experts on **CPU**
+and need converted weights. Sluice is the only one that streams experts onto the
+**GPU inside vLLM's serving stack**. [Full comparison + sources →](docs/COMPARISON.md)
 
 ---
 

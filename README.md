@@ -66,6 +66,62 @@ SLUICE_SLOTS=64 python examples/bitcompare_v2lite.py > sluice.txt   # streamed f
 diff baseline.txt sluice.txt && echo "BIT-IDENTICAL"
 ```
 
+## Deploying DeepSeek-V4
+
+**You do not need a vLLM fork.** Two separate things are involved, and both are
+already available without forking:
+
+- **V4 model support** is *upstream*: `DeepseekV4ForCausalLM` is in vLLM's model
+  registry in recent builds. Sluice adds nothing here.
+- **Expert offloading** is *this plugin*.
+
+You need three things:
+
+1. **A vLLM build that supports DeepSeek-V4.** Check:
+   ```bash
+   python -c "from vllm import ModelRegistry; print('DeepseekV4ForCausalLM' in ModelRegistry.get_supported_archs())"
+   ```
+   (Validated against vLLM `0.22.1rc1.dev26+g4721bb3aa`.)
+2. **Sluice installed in the same environment** (`pip install -e .`).
+3. **Enough host RAM for the experts.** The FP8 checkpoint is ~805 GiB; across
+   expert-parallel ranks the offloaded experts occupy roughly that much host RAM
+   in total. Validated on 4×H100-80GB + ~1.1 TiB RAM.
+
+### Online (OpenAI-compatible server)
+
+```bash
+SLUICE_SLOTS=16 \
+VLLM_WEIGHT_OFFLOADING_DISABLE_PIN_MEMORY=1 \
+PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
+vllm serve deepseek-ai/DeepSeek-V4-Pro \
+    --tensor-parallel-size 4 \
+    --enable-expert-parallel \
+    --moe-backend marlin \
+    --kv-cache-dtype fp8 \
+    --gpu-memory-utilization 0.45 \
+    --enforce-eager \
+    --max-model-len 512 \
+    --trust-remote-code
+```
+
+### Offline
+
+```bash
+SLUICE_SLOTS=16 python examples/run_dsv4_ep4.py
+```
+
+### Why each setting
+
+| Setting | Why |
+|---|---|
+| `SLUICE_SLOTS=16` | Activates Sluice; 16 resident experts per layer per rank. |
+| `--moe-backend marlin` | FP8 backend that honors `expert_map`. FlashInfer ignores it → wrong output. |
+| `--kv-cache-dtype fp8` | Required by DeepSeek-V4. |
+| `--enable-expert-parallel` | Shards experts across ranks; smaller per-rank host + slot footprint. |
+| `--gpu-memory-utilization 0.45` | Leaves VRAM for the post-load slot caches (see the KV-cache caveat). |
+| `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` | Avoids fragmentation OOMs. |
+| `VLLM_WEIGHT_OFFLOADING_DISABLE_PIN_MEMORY=1` | Optional; skip pinning hundreds of GB of host RAM. |
+
 ## Results
 
 Validated on a single 8×H100-80GB node.

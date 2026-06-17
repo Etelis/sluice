@@ -54,10 +54,27 @@ Needs an `expert_map`-honoring backend (`marlin` / `triton`, **not** FlashInfer)
 the low `--gpu-memory-utilization` leaves VRAM for the slot caches. Design,
 load/forward paths, and the gotchas: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 
+## Compared to other engines
+
+V4-Pro (FP8) is ~805 GiB — it can't sit GPU-resident on one 8×H100 node (640 GiB).
+
+| Engine | Routed experts | Expert compute | V4-Pro on ≤8×H100 |
+|---|---|---|---|
+| **Sluice** (vLLM) | host RAM → streamed to GPU cache | **GPU** | ✅ (ran on 4×H100) |
+| KTransformers | host RAM | CPU | ✅ |
+| llama.cpp | host RAM (`-ot` / `--n-cpu-moe`) | CPU | ✅ (GGUF) |
+| SGLang · stock vLLM | GPU-resident | GPU | ❌ needs ~2 nodes |
+
+Sluice is the only one that streams experts onto the **GPU** for compute **inside
+vLLM's serving stack** — KTransformers and llama.cpp run experts on CPU (less GPU,
+but CPU-bound); SGLang is fastest yet must fit the weights in VRAM.
+[Full comparison + sources →](docs/COMPARISON.md)
+
 ---
 
 <p align="center">
   Apache-2.0 · built on <a href="https://github.com/vllm-project/vllm">vLLM</a> ·
   <a href="docs/ARCHITECTURE.md">Architecture</a> ·
+  <a href="docs/COMPARISON.md">Comparison</a> ·
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>

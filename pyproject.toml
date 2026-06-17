@@ -26,8 +26,8 @@ dependencies = []
 dev = ["pytest", "ruff"]
 
 [project.urls]
-Homepage = "https://github.com/Itay-Etelis/sluice"
-Issues = "https://github.com/Itay-Etelis/sluice/issues"
+Homepage = "https://github.com/Etelis/sluice"
+Issues = "https://github.com/Etelis/sluice/issues"
 
 # This is the whole integration surface: vLLM loads general plugins in every
 # engine/worker process at startup and calls `register()`.

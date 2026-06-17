@@ -124,14 +124,17 @@ SLUICE_SLOTS=16 python examples/run_dsv4_ep4.py
 
 ## Results
 
-Validated on a single 8×H100-80GB node.
+Validated on a single 8×H100-80GB node, with the **pip-installed plugin on
+stock vLLM** — no fork, no patched source files (just `SLUICE_SLOTS` set).
 
 **DeepSeek-V2-Lite (BF16), single GPU — correctness:** offloaded output is
 **bit-identical** to the resident baseline on every prompt (greedy decode, token
-ids compared exactly).
+ids compared exactly). With `SLUICE_SLOTS=8` (below the per-step expert count)
+the LRU/eviction path is exercised; at `SLUICE_SLOTS=64` (fits-all) it is not —
+both produce the same tokens.
 
-**DeepSeek-V4-Pro (FP8), 4×H100, expert-parallel — scale:** a normal load
-cannot fit the experts. With Sluice:
+**DeepSeek-V4-Pro (FP8), 4×H100, expert-parallel — scale:** 384 experts, 96 per
+rank; a normal load cannot fit them. With Sluice:
 
 | | Value |
 |---|---|
@@ -140,6 +143,11 @@ cannot fit the experts. With Sluice:
 | Per-rank cache | **16 of 96** local experts resident per layer |
 | KV cache after offload | 24.4 GiB / ~46.7k tokens |
 | Output | coherent and correct |
+
+```
+'The capital of France is' -> ' Paris. The capital of Germany is Berlin.
+                               The capital of Italy is Rome. The capital of Japan is Tokyo.'
+```
 
 ```
 'The capital of France is' -> ' Paris. The capital of Germany is Berlin.

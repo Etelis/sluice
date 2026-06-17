@@ -67,7 +67,8 @@ V4-Pro (FP8) is ~805 GiB — it can't sit GPU-resident on one 8×H100 node (640 
 
 Sluice is the only one that streams experts onto the **GPU** for compute **inside
 vLLM's serving stack** — KTransformers and llama.cpp run experts on CPU (less GPU,
-but CPU-bound); SGLang is fastest yet must fit the weights in VRAM.
+but CPU-bound); SGLang is fastest yet must fit the weights in VRAM (verified: stock
+SGLang **OOMs loading V4-Pro on 4×H100**, same box Sluice serves it on).
 [Full comparison + sources →](docs/COMPARISON.md)
 
 ---

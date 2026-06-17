@@ -12,7 +12,7 @@ The honest axis isn't just *where the experts live* but **where they compute**.
 | **Sluice** (vLLM plugin) | host RAM, streamed into a small **GPU** cache (LRU, by routing) | **GPU** | ✅ — we ran it on **4×H100** + ~1 TB RAM | full vLLM (continuous batching, etc.) |
 | KTransformers | host RAM (shared experts on GPU) | **CPU** (AMX kernels) | ✅ — even 1 GPU (48 GB+) + big RAM | its own runtime |
 | llama.cpp | host RAM (`--n-cpu-moe` / `-ot exps=CPU`) | **CPU** | ✅ — flexible CPU/GPU split, GGUF | its own runtime |
-| SGLang | GPU-resident (CPU offload is a WIP KTransformers integration) | GPU | ❌ not on one node — needs ~2 nodes (≥~11×H100) for the FP8 weights | full SGLang |
+| SGLang | GPU-resident (a KTransformers offload path exists via `kt_*` args, needs KT-format weights) | GPU | ❌ **verified OOM on 4×H100**; needs ~2 nodes (≥~11×H100) | full SGLang |
 | vLLM (stock) | GPU-resident (`--cpu-offload-gb` is static, whole-tensor, routing-blind) | GPU | ❌ same — experts don't fit | full vLLM |
 
 > Model-architecture support varies by project and moves fast. vLLM and SGLang
@@ -36,13 +36,22 @@ Sluice does.
 
 **GPU-compute, weights must be reachable — SGLang, vLLM, and Sluice.** These run
 the experts on the GPU. SGLang and stock vLLM keep the weights GPU-resident, so
-V4-Pro needs ≈2 nodes; SGLang's CPU offload is an
-[in-progress KTransformers integration](https://github.com/sgl-project/sglang/issues/11425).
+V4-Pro needs ≈2 nodes. SGLang has gained a
+[KTransformers offload path](https://github.com/sgl-project/sglang/issues/11425)
+(exposed as `kt_weight_path` / `kt_method` server args), but it needs
+KT-format weights — the stock FP8/FP4 checkpoint loads GPU-resident.
 **Sluice** is the difference: it keeps the experts in host RAM and streams just
 the router-selected ones into a small GPU cache each step, so V4-Pro runs on
 4×H100 **without leaving vLLM** — you keep GPU compute, continuous batching, and
 the rest of the serving stack, at the cost of PCIe bandwidth for the streamed
 experts.
+
+> **Verified on our cluster (June 2026).** SGLang `0.5.13.post1` recognizes
+> `DeepseekV4ForCausalLM` and starts loading V4-Pro day-0, but with the stock
+> checkpoint it **OOMs on 4×H100** while creating the FP8 expert weights
+> (`fp8.py:create_weights` → GPU 0 fills at ~76 GiB, then `exit 137`) — the
+> same failure stock vLLM hits. Sluice loads and serves the same model on the
+> same 4×H100 box. 805 GiB > 640 GiB, so a single 8×H100 node is short too.
 
 ## So which should you use?
 
